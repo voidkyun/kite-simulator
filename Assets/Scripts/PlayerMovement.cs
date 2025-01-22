@@ -1,7 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.Burst.Intrinsics;
 using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public class PlayerMovement : MonoBehaviour
 {
@@ -12,7 +14,7 @@ public class PlayerMovement : MonoBehaviour
     public float sensX,sensY;
     public float yAngle;
     public float coefficient;
-    public GameObject gmObj;
+    public GameObject gmObj,thirdPersonCamera;
     public GameManager gameManager;
     public AudioSource[] audioSources;
     public PlayerStatus stat,laststat;
@@ -20,6 +22,12 @@ public class PlayerMovement : MonoBehaviour
     private float tsAngle;
     public Animator animator;
     public Renderer m_renderer;
+
+    public CameraMode cameraMode; 
+    public enum CameraMode{
+        FirstPerson,
+        ThirdPerson,
+    }
 
     public bool Started=false;
     // Start is called before the first frame update
@@ -40,14 +48,15 @@ public class PlayerMovement : MonoBehaviour
     {
         if(Started){
             translation=new Vector3(Input.GetAxisRaw("Horizontal"),0f,Input.GetAxisRaw("Vertical")).normalized;
-            tsAngle=Vector3.SignedAngle(Vector3.forward,translation,Vector3.up);
-            animator.SetFloat("tsAngle",tsAngle);
 
-            if(!gameManager.UIopen){
-                float mouseX = Input.GetAxis("Mouse X") * Time.deltaTime * sensX*coefficient;
-                yAngle+=mouseX;
+            switch(cameraMode){
+                case CameraMode.FirstPerson:
+                    FirstPersonUpdate();
+                    break;
+                case CameraMode.ThirdPerson:
+                    ThirdPersonUpdate();
+                    break;
             }
-            transform.rotation=Quaternion.Euler(0f,yAngle,0f);
 
             if(Input.GetKeyDown(KeyCode.LeftShift)){
                 isSprint=true;
@@ -96,6 +105,42 @@ public class PlayerMovement : MonoBehaviour
                 }
             }
             laststat=stat;
+
+            if(Input.GetKeyDown(KeyCode.F5)){
+                if(cameraMode==CameraMode.FirstPerson){
+                    cameraMode=CameraMode.ThirdPerson;
+                    thirdPersonCamera.SetActive(true);
+                }else{
+                    cameraMode=CameraMode.FirstPerson;
+                    thirdPersonCamera.SetActive(false);
+                }
+            }
+        }
+    }
+
+    void FirstPersonUpdate(){
+        tsAngle=Vector3.SignedAngle(Vector3.forward,translation,Vector3.up);
+        animator.SetFloat("tsAngle",tsAngle);
+
+        if(!gameManager.UIopen){
+            float mouseX = Input.GetAxis("Mouse X") * Time.deltaTime * sensX*coefficient;
+            yAngle+=mouseX;
+        }
+        transform.rotation=Quaternion.Euler(0f,yAngle,0f);
+    }
+
+    Quaternion gmd_rot;
+    Vector3 thirdPersonMoveDir;
+    void ThirdPersonUpdate(){
+        animator.SetFloat("tsAngle",0);
+        
+        if(translation!=Vector3.zero){
+            gmd_rot =  Quaternion.LookRotation(translation, Vector3.up);
+            Vector3 cam_forward = thirdPersonCamera.transform.forward;
+            thirdPersonMoveDir = (gmd_rot * (new Vector3 (cam_forward.x,0,cam_forward.z))).normalized;
+            transform.rotation = Quaternion.LookRotation(thirdPersonMoveDir, Vector3.up);
+        }else{
+            thirdPersonMoveDir = Vector3.zero;
         }
     }
 
@@ -126,13 +171,31 @@ public class PlayerMovement : MonoBehaviour
                     stat=PlayerStatus.Walking;
                 }
             }
-            if(grounded){
-                rb.AddForce(Quaternion.AngleAxis(transform.rotation.eulerAngles.y, Vector3.up)*translation* Speed * 10f*(isSprint? Sprint:1f), ForceMode.Acceleration);
+
+            switch(cameraMode){
+                case CameraMode.FirstPerson:
+                    FirstPersonFixedUpdate();
+                    break;
+                case CameraMode.ThirdPerson:
+                    ThirdPersonFixedUpdate();
+                    break;
             }
 
             if(grounded & isJumping){
                 rb.AddForce(Vector3.up*10f*JumpHeight,ForceMode.Impulse);
             }
+        }
+    }
+
+    void FirstPersonFixedUpdate(){
+        if(grounded){
+            rb.AddForce(Quaternion.AngleAxis(transform.rotation.eulerAngles.y, Vector3.up)*translation* Speed * 10f*(isSprint? Sprint:1f), ForceMode.Acceleration);
+        }
+    }
+
+    void ThirdPersonFixedUpdate(){
+        if(grounded){
+            rb.AddForce(thirdPersonMoveDir* Speed * 10f*(isSprint? Sprint:1f), ForceMode.Acceleration);
         }
     }
 }
