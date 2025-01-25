@@ -21,7 +21,6 @@ public class ThirdPersonCameraController : MonoBehaviour
     void Update()
     {
         distance=(player.transform.position-kite.transform.position).magnitude;
-        print(transposer);
         transposer.m_FollowOffset.z=-27*(distance/initialDistance);
     }
 }

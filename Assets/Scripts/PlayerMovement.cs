@@ -7,10 +7,10 @@ using UnityEngine.Rendering;
 
 public class PlayerMovement : MonoBehaviour
 {
-    public float Speed,Sprint,JumpHeight,groundDrag,airDrag,gravity;
+    public float Acceleration,MaxSpeed,Sprint,JumpHeight,groundDrag,gravity;
     Rigidbody rb;
     public LayerMask Ground;
-    public bool grounded,isSprint,isJumping;
+    public bool grounded,isSprint;
     public float sensX,sensY;
     public float yAngle;
     public float coefficient;
@@ -64,11 +64,9 @@ public class PlayerMovement : MonoBehaviour
             if(Input.GetKeyUp(KeyCode.LeftShift)){
                 isSprint=false;
             }
-            if(Input.GetKeyDown(KeyCode.Space)){
-                isJumping=true;
-            }
-            if(Input.GetKeyUp(KeyCode.Space)){
-                isJumping=false;
+
+            if(Input.GetKeyDown(KeyCode.Space) & grounded){
+                rb.AddForce(Vector3.up*JumpHeight, ForceMode.Impulse);
             }
             
             if(stat==PlayerStatus.Stop){
@@ -138,7 +136,8 @@ public class PlayerMovement : MonoBehaviour
             gmd_rot =  Quaternion.LookRotation(translation, Vector3.up);
             Vector3 cam_forward = thirdPersonCamera.transform.forward;
             thirdPersonMoveDir = (gmd_rot * (new Vector3 (cam_forward.x,0,cam_forward.z))).normalized;
-            transform.rotation = Quaternion.LookRotation(thirdPersonMoveDir, Vector3.up);
+            transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(thirdPersonMoveDir, Vector3.up), 720f*Time.deltaTime);
+            yAngle=transform.rotation.eulerAngles.y;
         }else{
             thirdPersonMoveDir = Vector3.zero;
         }
@@ -154,13 +153,16 @@ public class PlayerMovement : MonoBehaviour
         if(Started){
             rb.AddForce(Vector3.down*gravity, ForceMode.Acceleration);
             
-            //地面と接しているかを判断
             grounded = Physics.Raycast(transform.position, Vector3.down, transform.lossyScale.y + 0.2f, Ground);
-            //接している場合は、設定した減速値を代入しプレイヤーを滑りにくくする
-            if (grounded)
-                rb.drag = groundDrag;
-            else
-                rb.drag = airDrag;
+
+            Vector3 horizontalVelocity = new Vector3(rb.linearVelocity.x, 0, rb.linearVelocity.z);
+
+            if (grounded & horizontalVelocity.sqrMagnitude > 0.1f)
+                rb.AddForce(-horizontalVelocity.normalized * groundDrag, ForceMode.Acceleration);
+            
+            if(horizontalVelocity.sqrMagnitude>Mathf.Pow(MaxSpeed*(isSprint? Sprint: 1),2)){
+                rb.linearVelocity=new Vector3(0, rb.linearVelocity.y, 0) + horizontalVelocity.normalized*MaxSpeed*(isSprint? Sprint: 1);
+            }
 
             if(translation==Vector3.zero){
                 stat=PlayerStatus.Stop;
@@ -180,22 +182,15 @@ public class PlayerMovement : MonoBehaviour
                     ThirdPersonFixedUpdate();
                     break;
             }
-
-            if(grounded & isJumping){
-                rb.AddForce(Vector3.up*10f*JumpHeight,ForceMode.Impulse);
-            }
         }
     }
 
     void FirstPersonFixedUpdate(){
-        if(grounded){
-            rb.AddForce(Quaternion.AngleAxis(transform.rotation.eulerAngles.y, Vector3.up)*translation* Speed * 10f*(isSprint? Sprint:1f), ForceMode.Acceleration);
-        }
+        rb.AddForce(Quaternion.AngleAxis(transform.rotation.eulerAngles.y, Vector3.up)*translation*Acceleration, ForceMode.Acceleration);
+//      rb.AddForce(Quaternion.AngleAxis(transform.rotation.eulerAngles.y, Vector3.up)*translation* Speed * 10f*(isSprint? Sprint:1f), ForceMode.Acceleration);
     }
 
     void ThirdPersonFixedUpdate(){
-        if(grounded){
-            rb.AddForce(thirdPersonMoveDir* Speed * 10f*(isSprint? Sprint:1f), ForceMode.Acceleration);
-        }
+        rb.AddForce(thirdPersonMoveDir* Acceleration, ForceMode.Acceleration);
     }
 }

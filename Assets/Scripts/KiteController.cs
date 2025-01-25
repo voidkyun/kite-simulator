@@ -26,7 +26,7 @@ public class KiteController : MonoBehaviour
     }
 
     void FixedUpdate(){
-        Vector3 verocity=rb.velocity;
+        Vector3 verocity=rb.linearVelocity;
         windDirection=windDirection-verocity*runco;
         Vector3 upperForce=Vector3.up*windDirection.magnitude*upco;
         rb.AddForce(TensionalForce,ForceMode.Force);
