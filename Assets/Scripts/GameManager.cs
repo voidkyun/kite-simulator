@@ -59,8 +59,8 @@ public class GameManager : MonoBehaviour
         LanguageMenue.value = Array.IndexOf(locales, PlayerPrefs.GetString("locale", "en"));
 
         transform.Rotate(0f,UnityEngine.Random.value*360f,0f);
-        //WindForce=CurveWeightedRandom(initialwindforce)*10f;
-        WindForce=UnityEngine.Random.value*7f;
+        //WindForce=UnityEngine.Random.value*7f;
+        WindForce=8f;
         StartCoroutine(Playwind2(26f));
 
         started=true;
